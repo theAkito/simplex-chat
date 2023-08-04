@@ -42,6 +42,7 @@ import Simplex.Chat.Protocol
 import Simplex.Chat.Store (AutoAccept (..), StoreError (..), UserContactLink (..))
 import Simplex.Chat.Styled
 import Simplex.Chat.Types
+import Simplex.Chat.Types.Preferences
 import qualified Simplex.FileTransfer.Protocol as XFTP
 import Simplex.Messaging.Agent.Client (ProtocolTestFailure (..), ProtocolTestStep (..))
 import Simplex.Messaging.Agent.Env.SQLite (NetworkConfig (..))
@@ -114,6 +115,7 @@ responseToView user_ ChatConfig {logLevel, showReactions, showReceipts, testView
     HSGroups -> groupsHelpInfo
     HSContacts -> contactsHelpInfo
     HSMyAddress -> myAddressHelpInfo
+    HSIncognito -> incognitoHelpInfo
     HSMessages -> messagesHelpInfo
     HSMarkdown -> markdownInfo
     HSSettings -> settingsInfo
@@ -137,7 +139,8 @@ responseToView user_ ChatConfig {logLevel, showReactions, showReceipts, testView
   CRUserProfileNoChange u -> ttyUser u ["user profile did not change"]
   CRUserPrivacy u u' -> ttyUserPrefix u $ viewUserPrivacy u u'
   CRVersionInfo info _ _ -> viewVersionInfo logLevel info
-  CRInvitation u cReq -> ttyUser u $ viewConnReqInvitation cReq
+  CRInvitation u cReq _ -> ttyUser u $ viewConnReqInvitation cReq
+  CRConnectionIncognitoUpdated u c -> ttyUser u $ viewConnectionIncognitoUpdated c
   CRSentConfirmation u -> ttyUser u ["confirmation sent!"]
   CRSentInvitation u customUserProfile -> ttyUser u $ viewSentInvitation customUserProfile testView
   CRContactDeleted u c -> ttyUser u [ttyContact' c <> ": contact is deleted"]
@@ -464,11 +467,20 @@ localTs tz ts = do
 viewChatItemStatusUpdated :: AChatItem -> CurrentTime -> TimeZone -> Bool -> Bool -> [StyledString]
 viewChatItemStatusUpdated (AChatItem _ _ chat item@ChatItem {meta = CIMeta {itemStatus}}) ts tz testView showReceipts =
   case itemStatus of
-    CISSndRcvd rcptStatus ->
+    CISSndRcvd rcptStatus SSPPartial ->
+      if testView && showReceipts
+        then prependFirst (viewDeliveryReceiptPartial rcptStatus <> " ") $ viewChatItem chat item False ts tz
+        else []
+    CISSndRcvd rcptStatus SSPComplete ->
       if testView && showReceipts
         then prependFirst (viewDeliveryReceipt rcptStatus <> " ") $ viewChatItem chat item False ts tz
         else []
     _ -> []
+
+viewDeliveryReceiptPartial :: MsgReceiptStatus -> StyledString
+viewDeliveryReceiptPartial = \case
+  MROk -> "%"
+  MRBadMsgHash -> ttyError' "%!"
 
 viewDeliveryReceipt :: MsgReceiptStatus -> StyledString
 viewDeliveryReceipt = \case
@@ -1138,6 +1150,11 @@ viewConnectionAliasUpdated PendingContactConnection {pccConnId, localAlias}
   | localAlias == "" = ["connection " <> sShow pccConnId <> " alias removed"]
   | otherwise = ["connection " <> sShow pccConnId <> " alias updated: " <> plain localAlias]
 
+viewConnectionIncognitoUpdated :: PendingContactConnection -> [StyledString]
+viewConnectionIncognitoUpdated PendingContactConnection {pccConnId, customUserProfileId}
+  | isJust customUserProfileId = ["connection " <> sShow pccConnId <> " changed to incognito"]
+  | otherwise = ["connection " <> sShow pccConnId <> " changed to non incognito"]
+
 viewContactUpdated :: Contact -> Contact -> [StyledString]
 viewContactUpdated
   Contact {localDisplayName = n, profile = LocalProfile {fullName, contactLink}}
@@ -1359,6 +1376,7 @@ viewFileTransferStatusXFTP (AChatItem _ _ _ ChatItem {file = Just CIFile {fileId
     CIFSRcvComplete -> ["receiving " <> fstr <> " complete" <> maybe "" (\fp -> ", path: " <> plain fp) filePath]
     CIFSRcvCancelled -> ["receiving " <> fstr <> " cancelled"]
     CIFSRcvError -> ["receiving " <> fstr <> " error"]
+    CIFSInvalid text -> [fstr <> " invalid status: " <> plain text]
   where
     fstr = fileTransferStr fileId fileName
 viewFileTransferStatusXFTP _ = ["no file status"]
@@ -1528,6 +1546,7 @@ viewChatError logLevel = \case
     CECommandError e -> ["bad chat command: " <> plain e]
     CEAgentCommandError e -> ["agent command error: " <> plain e]
     CEInvalidFileDescription e -> ["invalid file description: " <> plain e]
+    CEConnectionIncognitoChangeProhibited -> ["incognito mode change prohibited"]
     CEInternalError e -> ["internal chat error: " <> plain e]
     CEException e -> ["exception: " <> plain e]
   -- e -> ["chat error: " <> sShow e]

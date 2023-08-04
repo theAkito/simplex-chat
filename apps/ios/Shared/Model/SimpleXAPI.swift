@@ -171,6 +171,12 @@ func apiSetUserContactReceipts(_ userId: Int64, userMsgReceiptSettings: UserMsgR
     throw r
 }
 
+func apiSetUserGroupReceipts(_ userId: Int64, userMsgReceiptSettings: UserMsgReceiptSettings) async throws {
+    let r = await chatSendCmd(.apiSetUserGroupReceipts(userId: userId, userMsgReceiptSettings: userMsgReceiptSettings))
+    if case .cmdOk = r { return }
+    throw r
+}
+
 func apiHideUser(_ userId: Int64, viewPwd: String) async throws -> User {
     try await setUserPrivacy_(.apiHideUser(userId: userId, viewPwd: viewPwd))
 }
@@ -796,29 +802,35 @@ func apiChatUnread(type: ChatType, id: Int64, unreadChat: Bool) async throws {
     try await sendCommandOkResp(.apiChatUnread(type: type, id: id, unreadChat: unreadChat))
 }
 
-func receiveFile(user: User, fileId: Int64) async {
-    if let chatItem = await apiReceiveFile(fileId: fileId) {
+func receiveFile(user: User, fileId: Int64, auto: Bool = false) async {
+    if let chatItem = await apiReceiveFile(fileId: fileId, auto: auto) {
         DispatchQueue.main.async { chatItemSimpleUpdate(user, chatItem) }
     }
 }
 
-func apiReceiveFile(fileId: Int64, inline: Bool? = nil) async -> AChatItem? {
+func apiReceiveFile(fileId: Int64, inline: Bool? = nil, auto: Bool = false) async -> AChatItem? {
     let r = await chatSendCmd(.receiveFile(fileId: fileId, inline: inline))
     let am = AlertManager.shared
     if case let .rcvFileAccepted(_, chatItem) = r { return chatItem }
     if case .rcvFileAcceptedSndCancelled = r {
-        am.showAlertMsg(
-            title: "Cannot receive file",
-            message: "Sender cancelled file transfer."
-        )
+        logger.debug("apiReceiveFile error: sender cancelled file transfer")
+        if !auto {
+            am.showAlertMsg(
+                title: "Cannot receive file",
+                message: "Sender cancelled file transfer."
+            )
+        }
     } else if let networkErrorAlert = networkErrorAlert(r) {
+        logger.error("apiReceiveFile network error: \(String(describing: r))")
         am.showAlert(networkErrorAlert)
     } else {
-        logger.error("apiReceiveFile error: \(String(describing: r))")
-        switch r {
-        case .chatCmdError(_, .error(.fileAlreadyReceiving)):
+        switch chatError(r) {
+        case .fileCancelled:
+            logger.debug("apiReceiveFile ignoring fileCancelled error")
+        case .fileAlreadyReceiving:
             logger.debug("apiReceiveFile ignoring fileAlreadyReceiving error")
         default:
+            logger.error("apiReceiveFile error: \(String(describing: r))")
             am.showAlertMsg(
                 title: "Error receiving file",
                 message: "Error: \(String(describing: r))"
@@ -1317,7 +1329,7 @@ func processReceivedMsg(_ res: ChatResponse) async {
             }
             if let file = cItem.autoReceiveFile() {
                 Task {
-                    await receiveFile(user: user, fileId: file.fileId)
+                    await receiveFile(user: user, fileId: file.fileId, auto: true)
                 }
             }
             if cItem.showNotification {
