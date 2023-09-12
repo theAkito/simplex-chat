@@ -111,3 +111,6 @@ A backup system may be implemented by attaching a headless app to a bouncer as o
 ## Unresolved questions
 
 - What to do with WebRTC/calls?
+- Do we want attaching only to a subset of profiles?
+- Do we want a client to mix remote and local profiles?
+- Do we want M-to-N sessions? (follows naturally from the previous two)
