@@ -8,11 +8,11 @@ Due to distributed nature of SimpleX chat and comprehensive encryption it is dif
 ## Solution
 
 A typical (and expected) solution for this is running a server on a master device which will handle all the communication.
-Then, additional "thin" clients would be able to present an interface, delegating everything else to the main.
+Then, additional "thin" client(s) would be able to present an interface, delegating everything else to the main.
 
 Fortunately, we already have such a protocol in our clients.
 CLI and GUI run a text+json RPC protocol to their chat core.
-Additonally, there is a WebSocket wrapper for it that facilitates making custom clients and bots.
+CLI has a WebSocket server for it that facilitates making custom clients and bots – it won't be usable here though.
 
 We can run this protocol over a secure channel designed specifically for this problem.
 
@@ -22,7 +22,7 @@ Then we can tweak clients to use this protocol instead of regular "local" profil
 
 For the sake of grounding and familiarity the roles are:
 * "Mobile": a master device which stores data and does the communication.
-* "Desktop": UI-only replica attached to the master.
+* "Desktop": UI client attached to the master.
 
 1. Discovery: a user wants to attach a desktop client to their mobile.
 2. Handshake: desktop and mobile establish a secure duplex session.
@@ -48,15 +48,20 @@ This can be solved in a few different ways:
 3. The mobile may start announcing itself with UDP broadcasts for the duration of the phase (bluetooth-style) using information in the QR code.
 4. A desktop may create a temporary SMP queue and show its address. The mobile then submits its server data to it.
 
+Another option is to run the server on desktop and have mobile discover it with the help of QR code to get server identity and keys and then on the network via some protocol. Using a fixed address is suboptimal as most networks have dynamic IPs.
+
 ### Handshake
 
 The aim of this phase is to establish a TLS+cryptobox session.
+
+TLS could be complex as we need to generate self-signed certificates on desktop (if it acts like a server). A plaintext ws connection with cryptobox encryption could be sufficient initially? 
 
 TBD
 
 ### Activity
 
-The desktop starts its chat core with a special parameter to signal that it should be using the session instead of its regular "local" state.
+The desktop starts its chat core with a special parameter to signal that it should be using the session instead of its regular "local" database. This can be determined per user profile.
+
 Other than that, the client behaves like it would do with a local chat state.
 Its chat core being handed a socket uses it to relay the chat protocol data.
 
@@ -67,6 +72,8 @@ Only a subset of the chat API should be available this way.
 Requests like `/_stop` or `/_db delete` should be filtered out and ignored.
 
 Some of the relayed commands (e.g. `/_read chat` or `/_reaction`) the mobile should apply to its own state too.
+
+A simpler solution could be that while desktop client is connected mobile UI is locked. When the session terminates, mobile UI gets unlocked and refreshed.
 
 > A tweak in protocol that would reply with an event like "accepted read of X up to Y" may remove the need for such matching and interpretation.
 
@@ -101,6 +108,8 @@ Since we know that chat API is text+JSON Zstd compression with pre-shared dictio
 ## "Should-works"
 
 File transfer appears to be running within the chat protocol.
+
+UI assumes that files are available in a local storage, the access to files is not part of chat RPC. This complicates things a lot.
 
 Attaching multiple sessions appears to be realistic without extensive modifications.
 
