@@ -1,68 +1,80 @@
 sequenceDiagram
-  actor UU as User
-  participant DA as Desktop App
-  participant DC as Desktop Controller
-  participant MC as Mobile Controller
-  participant MA as Mobile App
+  actor DU as Desktop
+  participant DI as Desktop UI
+  participant DC as Desktop Core
+  participant MC as Mobile Core
+  participant MI as Mobile UI
+  actor MU as Mobile
 
-  note over UU, MA: Discovery
-  UU->>DA: Request satellite profile
-  DA->>DC: Identity request
+  note over DU, MU: Discovery
+  DU->>DI: Request satellite profile
+  DI->>DC: Identity request
   note over DC: Broadcast identity
   activate DC
-  DC->>DA: Identity data
-  DA->>UU: Display identity QR code
-  UU->>MA: Scan QR code
-  MA->>MC: Register satellite identity
+  DC->>DI: Identity data
+  DI->>DU: Display identity QR code
+  MU->>MI: Scan QR code
+  MI->>MC: Register satellite identity
   activate MC
-  note over UU, MA: Handshake
+  note over DU, MU: Handshake
   DC->>MC: Identity broadcast
   MC->>DC: Identity challenge
   DC->>MC: Identity response
-  MC->>DC: Accept or reject
-  deactivate DC
-  note over UU, MA: Activity
-  note over MA: UI blocked<br>to prevent<br>state conflicts
-  activate MA
-  loop
-    par
-      DA->>DC: Chat request
-      DC->>MC: Satellite request
-      note over MC: unwrap chat api, handle, and wrap
-      MC->>MC: Apply relevant changes to local state
-      MC->>DC: Satellite response
-      DC->>DA: Chat response
-    and
-      MC->>DC: Satellite notification
-      DC->>DA: Chat notification
+  opt First time handshake
+    MC->>MI: Request confirmation
+    MI->>MU: “Confirm sharing all the stuff with device XXX"”
+    alt
+      MU->>MI: “Accept”
+      MI->>MC: Mark identity confirmed
+      MC->>DC: Send confirmation
+    else
+      MU->>MI: “Reject”
+      MI->>MC: Delete registered identity
+      MC->>DC: Send cancellation
     end
   end
-  deactivate MA
-  note over UU, MA: Restart
+  deactivate DC
+  note over DU, MU: Activity (only the main loop)
+  note over MI: UI blocked<br>to prevent<br>state conflicts
+  activate MI
+  loop
+    par
+      DI->>DC: Chat request
+      DC->>MC: Satellite request
+      note over MC: unwrap chat api, handle, and wrap
+      MC->>DC: Satellite response
+      DC->>DI: Chat response
+    and
+      MC->>DC: Satellite notification
+      DC->>DI: Chat notification
+    end
+  end
+  deactivate MI
+  note over DU, MU: Restart
   activate DC
   DC->>MC: Identity broadcast
   MC->>DC: Identity challenge
   DC->>MC: Identity response
   alt
-  MC->>DC: Accept
-  note over MA, DA: Resume activity
+    MC->>DC: Accept
+    note over MI, DI: Resume activity
   else
-  MC->>DC: Reject
-  note over MA, DA: Dispose session
+    MC->>DC: Reject
+    note over MI, DI: Dispose session
   end
 
-  note over UU, MA: Disposal
+  note over DU, MU: Disposal
   alt Satellite-initiated
-  UU->>DA: “Detach satellite”
-  DA->>DC: Terminate session
+  DU->>DI: “Detach satellite”
+  DI->>DC: Terminate session
   DC->>MC: Deregister identity
   else Host-initiated
-  UU->>MA: “Detach satellite”
-  MA->>MC: Deregister identity
+  MU->>MI: “Detach satellite”
+  MI->>MC: Deregister identity
   MC->>DC: Terminate session
-  DC->>DA: Invalidate session state
+  DC->>DI: Invalidate session state
   end
-  note over DA,DC: Remove session data
+  note over DI,DC: Remove session data
 
   opt No sessions remaining
     note over MC: Stop listener
