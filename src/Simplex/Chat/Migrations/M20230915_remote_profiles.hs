@@ -18,18 +18,10 @@ CREATE TABLE remote_devices (
   created_at TEXT NOT NULL DEFAULT(datetime('now')),
   updated_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
-
-ALTER TABLE users ADD COLUMN remote_device_id INTEGER REFERENCES remote_devices ON DELETE CASCADE;
-ALTER TABLE users ADD COLUMN remote_user_id INTEGER;
-
-CREATE INDEX idx_users_remote_device_id ON users(remote_device_id);
 |]
 
 down_m20230915_remote_profiles :: Query
 down_m20230915_remote_profiles =
   [sql|
-DROP INDEX idx_users_remote_device_id;
-ALTER TABLE users DROP COLUMN remote_device_id;
-ALTER TABLE users DROP COLUMN remote_user_id;
 DROP TABLE remote_devices;
 |]
