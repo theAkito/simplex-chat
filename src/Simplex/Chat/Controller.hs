@@ -164,7 +164,8 @@ chatActiveTo (ChatName cType name) = case cType of
 data ChatDatabase = ChatDatabase {chatStore :: SQLiteStore, agentStore :: SQLiteStore}
 
 data ChatController = ChatController
-  { currentUser :: TVar (Maybe User),
+  { satellideId :: TVar (Maybe SatIdentityId),
+    currentUser :: TVar (Maybe User),
     activeTo :: TVar ActiveTo,
     firstTime :: Bool,
     smpAgent :: AgentClient,
@@ -414,6 +415,13 @@ data ChatCommand
   | ResetAgentStats
   | GetAgentSubs
   | GetAgentSubsDetails
+  | SatRequestIdentity -- Client wants to connect
+  | SatIdentityRecord Text -- Host UI got OOB data
+  | SatIdentityConfirm -- Host UI confirmed connection
+  | SatIdentityReject -- Host UI rejected connection
+  | SatTakeover -- Host wants to temporary disconnect satellite to unblock its own UI
+  | SatTerminateIdentity -- Client wants to dispose session
+  | SatIdentityDeregister -- Host wants to dispose session
   deriving (Show)
 
 data ChatResponse
@@ -587,6 +595,12 @@ data ChatResponse
   | CRChatError {user_ :: Maybe User, chatError :: ChatError}
   | CRArchiveImported {archiveErrors :: [ArchiveError]}
   | CRTimedAction {action :: String, durationMilliseconds :: Int64}
+  | CRSatRequestIdentity {identity :: Text}
+  | CRSatIdentityRecord {satIdentityId :: Int64, identity :: Text}
+  | CRSatIdentityConfirmed{satIdentityId :: Int64}
+  | CRSatIdentityRejected{satIdentityId :: Int64}
+  | CRSatTookOver{satIdentityId :: Int64}
+  | CRSatIdentityDisposed{satIdentityId :: Int64}
   deriving (Show, Generic)
 
 logResponseToFile :: ChatResponse -> Bool
@@ -850,6 +864,7 @@ data ChatError
   | ChatErrorAgent {agentError :: AgentErrorType, connectionEntity_ :: Maybe ConnectionEntity}
   | ChatErrorStore {storeError :: StoreError}
   | ChatErrorDatabase {databaseError :: DatabaseError}
+  | ChatErrorSatellite -- TBD
   deriving (Show, Exception, Generic)
 
 instance ToJSON ChatError where
