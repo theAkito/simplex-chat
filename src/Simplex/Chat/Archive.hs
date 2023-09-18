@@ -110,18 +110,26 @@ data StorageFiles = StorageFiles
 
 storageFiles :: ChatMonad m => m StorageFiles
 storageFiles = do
+  liftIO $ putStrLn "LALAL 11"
   ChatController {chatStore, filesFolder, smpAgent} <- ask
+  liftIO $ putStrLn "LALAL 12"
   let SQLiteStore {dbFilePath = chatDb, dbEncrypted = chatEncrypted} = chatStore
       SQLiteStore {dbFilePath = agentDb, dbEncrypted = agentEncrypted} = agentClientStore smpAgent
+  liftIO $ putStrLn "LALAL 13"
   filesPath <- readTVarIO filesFolder
+  liftIO $ putStrLn "LALAL 14"
   pure StorageFiles {chatDb, chatEncrypted, agentDb, agentEncrypted, filesPath}
 
 sqlCipherExport :: forall m. ChatMonad m => DBEncryptionConfig -> m ()
 sqlCipherExport DBEncryptionConfig {currentKey = DBEncryptionKey key, newKey = DBEncryptionKey key'} =
   when (key /= key') $ do
+    liftIO $ putStrLn "LALAL 1"
     fs@StorageFiles {chatDb, chatEncrypted, agentDb, agentEncrypted} <- storageFiles
+    liftIO $ putStrLn "LALAL 2"
     checkFile `with` fs
+    liftIO $ putStrLn "LALAL 3"
     backup `with` fs
+    liftIO $ putStrLn "LALAL 4"
     (export chatDb chatEncrypted >> export agentDb agentEncrypted)
       `catchChatError` \e -> (restore `with` fs) >> throwError e
   where
@@ -130,13 +138,21 @@ sqlCipherExport DBEncryptionConfig {currentKey = DBEncryptionKey key, newKey = D
     restore f = copyFile (f <> ".bak") f
     checkFile f = unlessM (doesFileExist f) $ throwDBError $ DBErrorNoFile f
     export f dbEnc = do
+      liftIO $ putStrLn "LALAL 41"
       enc <- readTVarIO dbEnc
+      liftIO $ putStrLn "LALAL 42"
       when (enc && null key) $ throwDBError DBErrorEncrypted
+      liftIO $ putStrLn "LALAL 43"
       when (not enc && not (null key)) $ throwDBError DBErrorPlaintext
+      liftIO $ putStrLn "LALAL 44"
       withDB (`SQL.exec` exportSQL) DBErrorExport
+      liftIO $ putStrLn "LALAL 45"
       renameFile (f <> ".exported") f
+      liftIO $ putStrLn "LALAL 46"
       withDB (`SQL.exec` testSQL) DBErrorOpen
+      liftIO $ putStrLn "LALAL 47"
       atomically $ writeTVar dbEnc $ not (null key')
+      liftIO $ putStrLn "LALAL 48"
       where
         withDB a err =
           liftIO (bracket (SQL.open $ T.pack f) SQL.close a $> Nothing)
