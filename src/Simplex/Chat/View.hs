@@ -230,11 +230,6 @@ responseToView user_ ChatConfig {logLevel, showReactions, showReceipts, testView
   CRGroupLink u g cReq mRole -> ttyUser u $ groupLink_ "Group link:" g cReq mRole
   CRGroupLinkDeleted u g -> ttyUser u $ viewGroupLinkDeleted g
   CRAcceptingGroupJoinRequest _ g c -> [ttyFullContact c <> ": accepting request to join group " <> ttyGroup' g <> "..."]
-  CRNoMemberContactCreating u g m -> ttyUser u ["member " <> ttyGroup' g <> " " <> ttyMember m <> " does not have direct connection, creating"]
-  CRNewMemberContact u _ g m -> ttyUser u ["contact for member " <> ttyGroup' g <> " " <> ttyMember m <> " is created"]
-  CRNewMemberContactSentInv u _ct g m -> ttyUser u ["sent invitation to connect directly to member " <> ttyGroup' g <> " " <> ttyMember m]
-  CRNewMemberContactReceivedInv u ct g m -> ttyUser u [ttyGroup' g <> " " <> ttyMember m <> " is creating direct contact " <> ttyContact' ct <> " with you"]
-  CRMemberContactConnected u ct g m -> ttyUser u ["member " <> ttyGroup' g <> " " <> ttyMember m <> " is merged into " <> ttyContact' ct]
   CRMemberSubError u g m e -> ttyUser u [ttyGroup' g <> " member " <> ttyMember m <> " error: " <> sShow e]
   CRMemberSubSummary u summary -> ttyUser u $ viewErrorsSummary (filter (isJust . memberError) summary) " group member errors"
   CRGroupSubscribed u g -> ttyUser u $ viewGroupSubscribed g
@@ -667,17 +662,6 @@ viewConnReqInvitation cReq =
     "and ask them to connect: " <> highlight' "/c <invitation_link_above>"
   ]
 
-viewContactNotFound :: ContactName -> Maybe (GroupInfo, GroupMember) -> [StyledString]
-viewContactNotFound cName suspectedMember =
-  ["no contact " <> ttyContact cName <> useMessageMember]
-  where
-    useMessageMember = case suspectedMember of
-      Just (g, m) -> do
-        let GroupInfo {localDisplayName = gName} = g
-            GroupMember {localDisplayName = mName} = m
-        ", use " <> highlight' ("@#" <> T.unpack gName <> " " <> T.unpack mName <> " <your message>")
-      _ -> ""
-
 viewChatCleared :: AChatInfo -> [StyledString]
 viewChatCleared (AChatInfo _ chatInfo) = case chatInfo of
   DirectChat ct -> [ttyContact' ct <> ": all messages are removed locally ONLY"]
@@ -773,21 +757,21 @@ viewDirectMessagesProhibited MDSnd c = ["direct messages to indirect contact " <
 viewDirectMessagesProhibited MDRcv c = ["received prohibited direct message from indirect contact " <> ttyContact' c <> " (discarded)"]
 
 viewUserJoinedGroup :: GroupInfo -> [StyledString]
-viewUserJoinedGroup g =
-  case incognitoMembershipProfile g of
-    Just mp -> [ttyGroup' g <> ": you joined the group incognito as " <> incognitoProfile' (fromLocalProfile mp)]
-    Nothing -> [ttyGroup' g <> ": you joined the group"]
+viewUserJoinedGroup g@GroupInfo {membership = membership@GroupMember {memberProfile}} =
+  if memberIncognito membership
+    then [ttyGroup' g <> ": you joined the group incognito as " <> incognitoProfile' (fromLocalProfile memberProfile)]
+    else [ttyGroup' g <> ": you joined the group"]
 
 viewJoinedGroupMember :: GroupInfo -> GroupMember -> [StyledString]
 viewJoinedGroupMember g m =
   [ttyGroup' g <> ": " <> ttyMember m <> " joined the group "]
 
 viewReceivedGroupInvitation :: GroupInfo -> Contact -> GroupMemberRole -> [StyledString]
-viewReceivedGroupInvitation g c role =
+viewReceivedGroupInvitation g@GroupInfo {membership = membership@GroupMember {memberProfile}} c role =
   ttyFullGroup g <> ": " <> ttyContact' c <> " invites you to join the group as " <> plain (strEncode role) :
-  case incognitoMembershipProfile g of
-    Just mp -> ["use " <> highlight ("/j " <> groupName' g) <> " to join incognito as " <> incognitoProfile' (fromLocalProfile mp)]
-    Nothing -> ["use " <> highlight ("/j " <> groupName' g) <> " to accept"]
+  if memberIncognito membership
+    then ["use " <> highlight ("/j " <> groupName' g) <> " to join incognito as " <> incognitoProfile' (fromLocalProfile memberProfile)]
+    else ["use " <> highlight ("/j " <> groupName' g) <> " to accept"]
 
 groupPreserved :: GroupInfo -> [StyledString]
 groupPreserved g = ["use " <> highlight ("/d #" <> groupName' g) <> " to delete the group"]
@@ -875,7 +859,7 @@ viewGroupsList gs = map groupSS $ sortOn ldn_ gs
         memberCount = sShow currentMembers <> " member" <> if currentMembers == 1 then "" else "s"
 
 groupInvitation' :: GroupInfo -> StyledString
-groupInvitation' g@GroupInfo {localDisplayName = ldn, groupProfile = GroupProfile {fullName}} =
+groupInvitation' GroupInfo {localDisplayName = ldn, groupProfile = GroupProfile {fullName}, membership = membership@GroupMember {memberProfile}} =
   highlight ("#" <> ldn)
     <> optFullName ldn fullName
     <> " - you are invited ("
@@ -884,9 +868,10 @@ groupInvitation' g@GroupInfo {localDisplayName = ldn, groupProfile = GroupProfil
     <> highlight ("/d #" <> ldn)
     <> " to delete invitation)"
   where
-    joinText = case incognitoMembershipProfile g of
-      Just mp -> " to join as " <> incognitoProfile' (fromLocalProfile mp) <> ", "
-      Nothing -> " to join, "
+    joinText =
+      if memberIncognito membership
+        then " to join as " <> incognitoProfile' (fromLocalProfile memberProfile) <> ", "
+        else " to join, "
 
 viewContactsMerged :: Contact -> Contact -> [StyledString]
 viewContactsMerged _into@Contact {localDisplayName = c1} _merged@Contact {localDisplayName = c2} =
@@ -1559,7 +1544,6 @@ viewChatError logLevel = \case
             <> (", connection id: " <> show connId)
             <> maybe "" (\MsgMetaJSON {rcvId} -> ", agent msg rcv id: " <> show rcvId) msgMeta_
       ]
-    CEContactNotFound cName m_ -> viewContactNotFound cName m_
     CEContactNotReady c -> [ttyContact' c <> ": not ready"]
     CEContactDisabled Contact {localDisplayName = c} -> [ttyContact c <> ": disabled, to enable: " <> highlight ("/enable " <> c) <> ", to delete: " <> highlight ("/d " <> c)]
     CEConnectionDisabled Connection {connId, connType} -> [plain $ "connection " <> textEncode connType <> " (" <> tshow connId <> ") is disabled" | logLevel <= CLLWarning]
@@ -1586,8 +1570,8 @@ viewChatError logLevel = \case
     CEFileCancelled f -> ["file cancelled: " <> plain f]
     CEFileCancel fileId e -> ["error cancelling file " <> sShow fileId <> ": " <> sShow e]
     CEFileAlreadyExists f -> ["file already exists: " <> plain f]
-    CEFileRead f e -> ["cannot read file " <> plain f <> ": " <> plain e]
-    CEFileWrite f e -> ["cannot write file " <> plain f <> ": " <> plain e]
+    CEFileRead f e -> ["cannot read file " <> plain f, sShow e]
+    CEFileWrite f e -> ["cannot write file " <> plain f, sShow e]
     CEFileSend fileId e -> ["error sending file " <> sShow fileId <> ": " <> sShow e]
     CEFileRcvChunk e -> ["error receiving file: " <> plain e]
     CEFileInternal e -> ["file error: " <> plain e]
@@ -1613,7 +1597,6 @@ viewChatError logLevel = \case
     CEAgentCommandError e -> ["agent command error: " <> plain e]
     CEInvalidFileDescription e -> ["invalid file description: " <> plain e]
     CEConnectionIncognitoChangeProhibited -> ["incognito mode change prohibited"]
-    CEPeerChatVRangeIncompatible -> ["peer chat protocol version range incompatible"]
     CEInternalError e -> ["internal chat error: " <> plain e]
     CEException e -> ["exception: " <> plain e]
   -- e -> ["chat error: " <> sShow e]

@@ -22,7 +22,6 @@ struct GroupMemberInfoView: View {
     @State private var connectToMemberDialog: Bool = false
     @AppStorage(DEFAULT_DEVELOPER_TOOLS) private var developerTools = false
     @State private var justOpened = true
-    @State private var progressIndicator = false
 
     enum GroupMemberInfoViewAlert: Identifiable {
         case removeMemberAlert(mem: GroupMember)
@@ -66,154 +65,146 @@ struct GroupMemberInfoView: View {
     }
 
     private func groupMemberInfoView() -> some View {
-        ZStack {
-            VStack {
-                List {
-                    groupMemberInfoHeader(member)
-                        .listRowBackground(Color.clear)
+        VStack {
+            List {
+                groupMemberInfoHeader(member)
+                    .listRowBackground(Color.clear)
 
-                    if member.memberActive {
-                        Section {
-                            if let contactId = member.memberContactId, let chat = knownDirectChat(contactId) {
+                if member.memberActive {
+                    Section {
+                        if let contactId = member.memberContactId {
+                            if let chat = knownDirectChat(contactId) {
                                 knownDirectChatButton(chat)
                             } else if groupInfo.fullGroupPreferences.directMessages.on {
-                                if let contactId = member.memberContactId {
-                                    newDirectChatButton(contactId)
-                                } else if member.activeConn?.peerChatVRange.isCompatibleRange(CREATE_MEMBER_CONTACT_VRANGE) ?? false {
-                                    createMemberContactButton()
-                                }
+                                newDirectChatButton(contactId)
                             }
-                            if let code = connectionCode { verifyCodeButton(code) }
-                            if let connStats = connectionStats,
-                               connStats.ratchetSyncAllowed {
-                                synchronizeConnectionButton()
-                            }
-                            // } else if developerTools {
-                            //     synchronizeConnectionButtonForce()
-                            // }
                         }
+                        if let code = connectionCode { verifyCodeButton(code) }
+                        if let connStats = connectionStats,
+                           connStats.ratchetSyncAllowed {
+                            synchronizeConnectionButton()
+                        }
+//                        } else if developerTools {
+//                            synchronizeConnectionButtonForce()
+//                        }
                     }
+                }
 
-                    if let contactLink = member.contactLink {
-                        Section {
-                            QRCode(uri: contactLink)
-                            Button {
-                                showShareSheet(items: [contactLink])
-                            } label: {
-                                Label("Share address", systemImage: "square.and.arrow.up")
-                            }
-                            if let contactId = member.memberContactId {
-                                if knownDirectChat(contactId) == nil && !groupInfo.fullGroupPreferences.directMessages.on {
-                                    connectViaAddressButton(contactLink)
-                                }
-                            } else {
+                if let contactLink = member.contactLink {
+                    Section {
+                        QRCode(uri: contactLink)
+                        Button {
+                            showShareSheet(items: [contactLink])
+                        } label: {
+                            Label("Share address", systemImage: "square.and.arrow.up")
+                        }
+                        if let contactId = member.memberContactId {
+                            if knownDirectChat(contactId) == nil && !groupInfo.fullGroupPreferences.directMessages.on {
                                 connectViaAddressButton(contactLink)
                             }
-                        } header: {
-                            Text("Address")
-                        } footer: {
-                            Text("You can share this address with your contacts to let them connect with **\(member.displayName)**.")
-                        }
-                    }
-
-                    Section("Member") {
-                        infoRow("Group", groupInfo.displayName)
-
-                        if let roles = member.canChangeRoleTo(groupInfo: groupInfo) {
-                            Picker("Change role", selection: $newRole) {
-                                ForEach(roles) { role in
-                                    Text(role.text)
-                                }
-                            }
-                            .frame(height: 36)
                         } else {
-                            infoRow("Role", member.memberRole.text)
+                            connectViaAddressButton(contactLink)
                         }
+                    } header: {
+                        Text("Address")
+                    } footer: {
+                        Text("You can share this address with your contacts to let them connect with **\(member.displayName)**.")
+                    }
+                }
 
-                        // TODO invited by - need to get contact by contact id
-                        if let conn = member.activeConn {
-                            let connLevelDesc = conn.connLevel == 0 ? NSLocalizedString("direct", comment: "connection level description") : String.localizedStringWithFormat(NSLocalizedString("indirect (%d)", comment: "connection level description"), conn.connLevel)
-                            infoRow("Connection", connLevelDesc)
+                Section("Member") {
+                    infoRow("Group", groupInfo.displayName)
+
+                    if let roles = member.canChangeRoleTo(groupInfo: groupInfo) {
+                        Picker("Change role", selection: $newRole) {
+                            ForEach(roles) { role in
+                                Text(role.text)
+                            }
                         }
+                        .frame(height: 36)
+                    } else {
+                        infoRow("Role", member.memberRole.text)
                     }
 
-                    if let connStats = connectionStats {
-                        Section("Servers") {
-                            // TODO network connection status
-                            Button("Change receiving address") {
-                                alert = .switchAddressAlert
+                    // TODO invited by - need to get contact by contact id
+                    if let conn = member.activeConn {
+                        let connLevelDesc = conn.connLevel == 0 ? NSLocalizedString("direct", comment: "connection level description") : String.localizedStringWithFormat(NSLocalizedString("indirect (%d)", comment: "connection level description"), conn.connLevel)
+                        infoRow("Connection", connLevelDesc)
+                    }
+                }
+
+                if let connStats = connectionStats {
+                    Section("Servers") {
+                        // TODO network connection status
+                        Button("Change receiving address") {
+                            alert = .switchAddressAlert
+                        }
+                        .disabled(
+                            connStats.rcvQueuesInfo.contains { $0.rcvSwitchStatus != nil }
+                            || connStats.ratchetSyncSendProhibited
+                        )
+                        if connStats.rcvQueuesInfo.contains(where: { $0.rcvSwitchStatus != nil }) {
+                            Button("Abort changing address") {
+                                alert = .abortSwitchAddressAlert
                             }
                             .disabled(
-                                connStats.rcvQueuesInfo.contains { $0.rcvSwitchStatus != nil }
+                                connStats.rcvQueuesInfo.contains { $0.rcvSwitchStatus != nil && !$0.canAbortSwitch }
                                 || connStats.ratchetSyncSendProhibited
                             )
-                            if connStats.rcvQueuesInfo.contains(where: { $0.rcvSwitchStatus != nil }) {
-                                Button("Abort changing address") {
-                                    alert = .abortSwitchAddressAlert
-                                }
-                                .disabled(
-                                    connStats.rcvQueuesInfo.contains { $0.rcvSwitchStatus != nil && !$0.canAbortSwitch }
-                                    || connStats.ratchetSyncSendProhibited
-                                )
-                            }
-                            smpServers("Receiving via", connStats.rcvQueuesInfo.map { $0.rcvServer })
-                            smpServers("Sending via", connStats.sndQueuesInfo.map { $0.sndServer })
                         }
-                    }
-
-                    if member.canBeRemoved(groupInfo: groupInfo) {
-                        Section {
-                            removeMemberButton(member)
-                        }
-                    }
-
-                    if developerTools {
-                        Section("For console") {
-                            infoRow("Local name", member.localDisplayName)
-                            infoRow("Database ID", "\(member.groupMemberId)")
-                        }
+                        smpServers("Receiving via", connStats.rcvQueuesInfo.map { $0.rcvServer })
+                        smpServers("Sending via", connStats.sndQueuesInfo.map { $0.sndServer })
                     }
                 }
-                .navigationBarHidden(true)
-                .onAppear {
-                    if #unavailable(iOS 16) {
-                        // this condition prevents re-setting picker
-                        if !justOpened { return }
+
+                if member.canBeRemoved(groupInfo: groupInfo) {
+                    Section {
+                        removeMemberButton(member)
                     }
-                    newRole = member.memberRole
-                    do {
-                        let (_, stats) = try apiGroupMemberInfo(groupInfo.apiId, member.groupMemberId)
-                        let (mem, code) = member.memberActive ? try apiGetGroupMemberCode(groupInfo.apiId, member.groupMemberId) : (member, nil)
-                        member = mem
-                        connectionStats = stats
-                        connectionCode = code
-                    } catch let error {
-                        logger.error("apiGroupMemberInfo or apiGetGroupMemberCode error: \(responseError(error))")
-                    }
-                    justOpened = false
                 }
-                .onChange(of: newRole) { _ in
-                    if newRole != member.memberRole {
-                        alert = .changeMemberRoleAlert(mem: member, role: newRole)
+
+                if developerTools {
+                    Section("For console") {
+                        infoRow("Local name", member.localDisplayName)
+                        infoRow("Database ID", "\(member.groupMemberId)")
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .alert(item: $alert) { alertItem in
-                switch(alertItem) {
-                case let .removeMemberAlert(mem): return removeMemberAlert(mem)
-                case let .changeMemberRoleAlert(mem, _): return changeMemberRoleAlert(mem)
-                case .switchAddressAlert: return switchAddressAlert(switchMemberAddress)
-                case .abortSwitchAddressAlert: return abortSwitchAddressAlert(abortSwitchMemberAddress)
-                case .syncConnectionForceAlert: return syncConnectionForceAlert({ syncMemberConnection(force: true) })
-                case let .connRequestSentAlert(type): return connReqSentAlert(type)
-                case let .error(title, error): return Alert(title: Text(title), message: Text(error))
-                case let .other(alert): return alert
+            .navigationBarHidden(true)
+            .onAppear {
+                if #unavailable(iOS 16) {
+                    // this condition prevents re-setting picker
+                    if !justOpened { return }
+                }
+                newRole = member.memberRole
+                do {
+                    let (_, stats) = try apiGroupMemberInfo(groupInfo.apiId, member.groupMemberId)
+                    let (mem, code) = member.memberActive ? try apiGetGroupMemberCode(groupInfo.apiId, member.groupMemberId) : (member, nil)
+                    member = mem
+                    connectionStats = stats
+                    connectionCode = code
+                } catch let error {
+                    logger.error("apiGroupMemberInfo or apiGetGroupMemberCode error: \(responseError(error))")
+                }
+                justOpened = false
+            }
+            .onChange(of: newRole) { _ in
+                if newRole != member.memberRole {
+                    alert = .changeMemberRoleAlert(mem: member, role: newRole)
                 }
             }
-
-            if progressIndicator {
-                ProgressView().scaleEffect(2)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .alert(item: $alert) { alertItem in
+            switch(alertItem) {
+            case let .removeMemberAlert(mem): return removeMemberAlert(mem)
+            case let .changeMemberRoleAlert(mem, _): return changeMemberRoleAlert(mem)
+            case .switchAddressAlert: return switchAddressAlert(switchMemberAddress)
+            case .abortSwitchAddressAlert: return abortSwitchAddressAlert(abortSwitchMemberAddress)
+            case .syncConnectionForceAlert: return syncConnectionForceAlert({ syncMemberConnection(force: true) })
+            case let .connRequestSentAlert(type): return connReqSentAlert(type)
+            case let .error(title, error): return Alert(title: Text(title), message: Text(error))
+            case let .other(alert): return alert
             }
         }
     }
@@ -263,33 +254,6 @@ struct GroupMemberInfoView: View {
                 }
             } catch let error {
                 logger.error("openDirectChatButton apiGetChat error: \(responseError(error))")
-            }
-        } label: {
-            Label("Send direct message", systemImage: "message")
-        }
-    }
-
-    func createMemberContactButton() -> some View {
-        Button {
-            progressIndicator = true
-            Task {
-                do {
-                    let memberContact = try await apiCreateMemberContact(groupInfo.apiId, member.groupMemberId)
-                    await MainActor.run {
-                        progressIndicator = false
-                        chatModel.addChat(Chat(chatInfo: .direct(contact: memberContact)))
-                        dismissAllSheets(animated: true)
-                        chatModel.chatId = memberContact.id
-                        chatModel.setContactNetworkStatus(memberContact, .connected)
-                    }
-                } catch let error {
-                    logger.error("createMemberContactButton apiCreateMemberContact error: \(responseError(error))")
-                    let a = getErrorAlert(error, "Error creating member contact")
-                    await MainActor.run {
-                        progressIndicator = false
-                        alert = .error(title: a.title, error: a.message)
-                    }
-                }
             }
         } label: {
             Label("Send direct message", systemImage: "message")

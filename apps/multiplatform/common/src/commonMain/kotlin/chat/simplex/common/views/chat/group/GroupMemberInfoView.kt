@@ -35,7 +35,6 @@ import chat.simplex.common.views.newchat.*
 import chat.simplex.common.views.usersettings.SettingsActionItem
 import chat.simplex.common.model.GroupInfo
 import chat.simplex.common.platform.*
-import chat.simplex.common.views.chatlist.openChat
 import chat.simplex.res.MR
 import kotlinx.datetime.Clock
 
@@ -53,8 +52,6 @@ fun GroupMemberInfoView(
   val chat = chatModel.chats.firstOrNull { it.id == chatModel.chatId.value }
   val connStats = remember { mutableStateOf(connectionStats) }
   val developerTools = chatModel.controller.appPrefs.developerTools.get()
-  var progressIndicator by remember { mutableStateOf(false) }
-
   if (chat != null) {
     val newRole = remember { mutableStateOf(member.memberRole) }
     GroupMemberInfoLayout(
@@ -77,20 +74,6 @@ fun GroupMemberInfoView(
             chatModel.chatId.value = c.id
             closeAll()
           }
-        }
-      },
-      createMemberContact = {
-        withApi {
-          progressIndicator = true
-          val memberContact = chatModel.controller.apiCreateMemberContact(groupInfo.apiId, member.groupMemberId)
-          if (memberContact != null) {
-            val memberChat = Chat(ChatInfo.Direct(memberContact), chatItems = arrayListOf())
-            chatModel.addChat(memberChat)
-            openChat(memberChat, chatModel)
-            closeAll()
-            chatModel.setContactNetworkStatus(memberContact, NetworkStatus.Connected())
-          }
-          progressIndicator = false
         }
       },
       connectViaAddress = { connReqUri ->
@@ -187,10 +170,6 @@ fun GroupMemberInfoView(
         }
       }
     )
-
-    if (progressIndicator) {
-      ProgressIndicator()
-    }
   }
 }
 
@@ -222,7 +201,6 @@ fun GroupMemberInfoLayout(
   connectionCode: String?,
   getContactChat: (Long) -> Chat?,
   openDirectChat: (Long) -> Unit,
-  createMemberContact: () -> Unit,
   connectViaAddress: (String) -> Unit,
   removeMember: () -> Unit,
   onRoleSelected: (GroupMemberRole) -> Unit,
@@ -259,13 +237,9 @@ fun GroupMemberInfoLayout(
 
     if (member.memberActive) {
       SectionView {
-        if (contactId != null && knownDirectChat(contactId) != null) {
-          OpenChatButton(onClick = { openDirectChat(contactId) })
-        } else if (groupInfo.fullGroupPreferences.directMessages.on) {
-          if (contactId != null) {
+        if (contactId != null) {
+          if (knownDirectChat(contactId) != null || groupInfo.fullGroupPreferences.directMessages.on) {
             OpenChatButton(onClick = { openDirectChat(contactId) })
-          } else if (member.activeConn?.peerChatVRange?.isCompatibleRange(CREATE_MEMBER_CONTACT_VRANGE) == true) {
-            OpenChatButton(onClick = { createMemberContact() })
           }
         }
         if (connectionCode != null) {
@@ -524,7 +498,6 @@ fun PreviewGroupMemberInfoLayout() {
       connectionCode = "123",
       getContactChat = { Chat.sampleData },
       openDirectChat = {},
-      createMemberContact = {},
       connectViaAddress = {},
       removeMember = {},
       onRoleSelected = {},

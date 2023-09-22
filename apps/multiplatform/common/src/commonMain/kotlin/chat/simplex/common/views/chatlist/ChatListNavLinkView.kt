@@ -103,7 +103,11 @@ fun ChatListNavLinkView(chat: Chat, chatModel: ChatModel) {
 }
 
 fun directChatAction(chatInfo: ChatInfo, chatModel: ChatModel) {
-  withBGApi { openChat(chatInfo, chatModel) }
+  if (chatInfo.ready) {
+    withBGApi { openChat(chatInfo, chatModel) }
+  } else {
+    pendingContactAlertDialog(chatInfo, chatModel)
+  }
 }
 
 fun groupChatAction(groupInfo: GroupInfo, chatModel: ChatModel) {
@@ -114,26 +118,13 @@ fun groupChatAction(groupInfo: GroupInfo, chatModel: ChatModel) {
   }
 }
 
-suspend fun openDirectChat(contactId: Long, chatModel: ChatModel) {
-  val chat = chatModel.controller.apiGetChat(ChatType.Direct, contactId)
-  if (chat != null) {
-    chatModel.chatItems.clear()
-    chatModel.chatItems.addAll(chat.chatItems)
-    chatModel.chatId.value = "@$contactId"
-  }
-}
-
 suspend fun openChat(chatInfo: ChatInfo, chatModel: ChatModel) {
   val chat = chatModel.controller.apiGetChat(chatInfo.chatType, chatInfo.apiId)
   if (chat != null) {
-    openChat(chat, chatModel)
+    chatModel.chatItems.clear()
+    chatModel.chatItems.addAll(chat.chatItems)
+    chatModel.chatId.value = chatInfo.id
   }
-}
-
-suspend fun openChat(chat: Chat, chatModel: ChatModel) {
-  chatModel.chatItems.clear()
-  chatModel.chatItems.addAll(chat.chatItems)
-  chatModel.chatId.value = chat.chatInfo.id
 }
 
 suspend fun apiLoadPrevMessages(chatInfo: ChatInfo, chatModel: ChatModel, beforeChatItemId: Long, search: String) {

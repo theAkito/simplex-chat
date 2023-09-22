@@ -181,11 +181,7 @@ struct ChatPreviewView: View {
             switch (chat.chatInfo) {
             case let .direct(contact):
                 if !contact.ready {
-                    if contact.nextSendGrpInv {
-                        chatPreviewInfoText("send direct message")
-                    } else {
-                        chatPreviewInfoText("connecting…")
-                    }
+                    chatPreviewInfoText("connecting…")
                 }
             case let .group(groupInfo):
                 switch (groupInfo.membership.memberStatus) {

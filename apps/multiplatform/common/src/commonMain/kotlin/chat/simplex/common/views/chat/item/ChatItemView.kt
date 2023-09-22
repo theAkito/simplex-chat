@@ -54,7 +54,6 @@ fun ChatItemView(
   acceptCall: (Contact) -> Unit,
   scrollToItem: (Long) -> Unit,
   acceptFeature: (Contact, ChatFeature, Int?) -> Unit,
-  openDirectChat: (Long) -> Unit,
   updateContactStats: (Contact) -> Unit,
   updateMemberStats: (GroupInfo, GroupMember) -> Unit,
   syncContactConnection: (Contact) -> Unit,
@@ -349,7 +348,6 @@ fun ChatItemView(
           is CIContent.SndGroupInvitation -> CIGroupInvitationView(cItem, c.groupInvitation, c.memberRole, joinGroup = joinGroup, chatIncognito = cInfo.incognito)
           is CIContent.RcvGroupEventContent -> when (c.rcvGroupEvent) {
             is RcvGroupEvent.MemberConnected -> CIEventView(membersConnectedItemText())
-            is RcvGroupEvent.MemberCreatedContact -> CIMemberCreatedContactView(cItem, openDirectChat)
             else -> EventItemView()
           }
           is CIContent.SndGroupEventContent -> EventItemView()
@@ -574,7 +572,6 @@ fun PreviewChatItemView() {
       acceptCall = { _ -> },
       scrollToItem = {},
       acceptFeature = { _, _, _ -> },
-      openDirectChat = { _ -> },
       updateContactStats = { },
       updateMemberStats = { _, _ -> },
       syncContactConnection = { },
@@ -604,7 +601,6 @@ fun PreviewChatItemViewDeletedContent() {
       acceptCall = { _ -> },
       scrollToItem = {},
       acceptFeature = { _, _, _ -> },
-      openDirectChat = { _ -> },
       updateContactStats = { },
       updateMemberStats = { _, _ -> },
       syncContactConnection = { },

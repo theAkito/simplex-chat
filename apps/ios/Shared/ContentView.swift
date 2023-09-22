@@ -35,7 +35,7 @@ struct ContentView: View {
 
         var id: String {
             switch self {
-            case let .connectViaUrl(_, link): return "connectViaUrl \(link)"
+            case .connectViaUrl: return "connectViaUrl \(link)"
             }
         }
     }
@@ -285,20 +285,18 @@ struct ContentView: View {
     }
 
     func connectViaUrl() {
-        dismissAllSheets() {
-            let m = ChatModel.shared
-            if let url = m.appOpenUrl {
-                m.appOpenUrl = nil
-                var path = url.path
-                logger.debug("ContentView.connectViaUrl path: \(path)")
-                if (path == "/contact" || path == "/invitation") {
-                    path.removeFirst()
-                    let action: ConnReqType = path == "contact" ? .contact : .invitation
-                    let link = url.absoluteString.replacingOccurrences(of: "///\(path)", with: "/\(path)")
-                    chatListActionSheet = .connectViaUrl(action: action, link: link)
-                } else {
-                    AlertManager.shared.showAlert(Alert(title: Text("Error: URL is invalid")))
-                }
+        let m = ChatModel.shared
+        if let url = m.appOpenUrl {
+            m.appOpenUrl = nil
+            var path = url.path
+            logger.debug("ContentView.connectViaUrl path: \(path)")
+            if (path == "/contact" || path == "/invitation") {
+                path.removeFirst()
+                let action: ConnReqType = path == "contact" ? .contact : .invitation
+                let link = url.absoluteString.replacingOccurrences(of: "///\(path)", with: "/\(path)")
+                chatListActionSheet = .connectViaUrl(action: action, link: link)
+            } else {
+                AlertManager.shared.showAlert(Alert(title: Text("Error: URL is invalid")))
             }
         }
     }

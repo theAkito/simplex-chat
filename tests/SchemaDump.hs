@@ -69,9 +69,7 @@ skipComparisonForDownMigrations =
   [ -- on down migration msg_delivery_events table moves down to the end of the file
     "20230504_recreate_msg_delivery_events_cleanup_messages",
     -- on down migration idx_chat_items_timed_delete_at index moves down to the end of the file
-    "20230529_indexes",
-    -- table and index definitions move down the file, so fields are re-created as not unique
-    "20230914_member_probes"
+    "20230529_indexes"
   ]
 
 getSchema :: FilePath -> FilePath -> IO String

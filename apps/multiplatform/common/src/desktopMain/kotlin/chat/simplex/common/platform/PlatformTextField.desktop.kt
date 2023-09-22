@@ -33,7 +33,6 @@ import kotlin.text.substring
 @Composable
 actual fun PlatformTextField(
   composeState: MutableState<ComposeState>,
-  sendMsgEnabled: Boolean,
   textStyle: MutableState<TextStyle>,
   showDeleteTextButton: MutableState<Boolean>,
   userIsObserver: Boolean,
@@ -43,7 +42,6 @@ actual fun PlatformTextField(
 ) {
   val cs = composeState.value
   val focusRequester = remember { FocusRequester() }
-  val focusManager = LocalFocusManager.current
   val keyboard = LocalSoftwareKeyboardController.current
   val padding = PaddingValues(12.dp, 12.dp, 45.dp, 0.dp)
   LaunchedEffect(cs.contextItem) {
@@ -52,13 +50,6 @@ actual fun PlatformTextField(
     focusRequester.requestFocus()
     delay(50)
     keyboard?.show()
-  }
-  LaunchedEffect(sendMsgEnabled) {
-    if (!sendMsgEnabled) {
-      focusManager.clearFocus()
-      delay(50)
-      keyboard?.hide()
-    }
   }
   val isRtl = remember(cs.message) { isRtl(cs.message.subSequence(0, min(50, cs.message.length))) }
   var textFieldValueState by remember { mutableStateOf(TextFieldValue(text = cs.message)) }
@@ -122,8 +113,7 @@ actual fun PlatformTextField(
           }
         }
       }
-    },
-
+    }
   )
   showDeleteTextButton.value = cs.message.split("\n").size >= 4 && !cs.inProgress
   if (composeState.value.preview is ComposePreview.VoicePreview) {

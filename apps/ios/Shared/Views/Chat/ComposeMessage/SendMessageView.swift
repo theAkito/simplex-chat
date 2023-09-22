@@ -17,7 +17,6 @@ struct SendMessageView: View {
     var sendLiveMessage: (() async -> Void)? = nil
     var updateLiveMessage: (() async -> Void)? = nil
     var cancelLiveMessage: (() -> Void)? = nil
-    var nextSendGrpInv: Bool = false
     var showVoiceMessageButton: Bool = true
     var voiceMessageAllowed: Bool = true
     var showEnableVoiceMessagesAlert: ChatInfo.ShowEnableVoiceMessagesAlert = .other
@@ -119,9 +118,7 @@ struct SendMessageView: View {
 
     @ViewBuilder private func composeActionButtons() -> some View {
         let vmrs = composeState.voiceMessageRecordingState
-        if nextSendGrpInv {
-            inviteMemberContactButton()
-        } else if showVoiceMessageButton
+        if showVoiceMessageButton
             && composeState.message.isEmpty
             && !composeState.editing
             && composeState.liveMessage == nil
@@ -163,24 +160,6 @@ struct SendMessageView: View {
         }
         .foregroundColor(Color(uiColor: .tertiaryLabel))
         .padding([.top, .trailing], 4)
-    }
-
-    private func inviteMemberContactButton() -> some View {
-        Button {
-            sendMessage(nil)
-        } label: {
-            Image(systemName: "arrow.up.circle.fill")
-                .resizable()
-                .foregroundColor(sendButtonColor)
-                .frame(width: sendButtonSize, height: sendButtonSize)
-                .opacity(sendButtonOpacity)
-        }
-        .disabled(
-            !composeState.sendEnabled ||
-            composeState.inProgress
-        )
-        .frame(width: 29, height: 29)
-        .padding([.bottom, .trailing], 4)
     }
 
     private func sendMessageButton() -> some View {

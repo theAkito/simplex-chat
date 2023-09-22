@@ -190,7 +190,6 @@ ciRequiresAttention content = case msgDirection @d of
       RGEGroupDeleted -> True
       RGEGroupUpdated _ -> False
       RGEInvitedViaGroupLink -> False
-      RGEMemberCreatedContact -> False
     CIRcvConnEvent _ -> True
     CIRcvChatFeature {} -> False
     CIRcvChatPreference {} -> False
@@ -214,7 +213,6 @@ data RcvGroupEvent
   -- but being RcvGroupEvent allows them to be assigned to the respective member (and so enable "send direct message")
   -- and be created as unread without adding / working around new status for sent items
   | RGEInvitedViaGroupLink -- CRSentGroupInvitationViaLink
-  | RGEMemberCreatedContact -- CRNewMemberContactReceivedInv
   deriving (Show, Generic)
 
 instance FromJSON RcvGroupEvent where
@@ -380,7 +378,6 @@ rcvGroupEventToText = \case
   RGEGroupDeleted -> "deleted group"
   RGEGroupUpdated _ -> "group profile updated"
   RGEInvitedViaGroupLink -> "invited via your group link"
-  RGEMemberCreatedContact -> "started direct connection with you"
 
 sndGroupEventToText :: SndGroupEvent -> Text
 sndGroupEventToText = \case

@@ -1243,9 +1243,6 @@
 "Encrypt database?" = "データベースを暗号化しますか？";
 
 /* No comment provided by engineer. */
-"Encrypt local files" = "ローカルファイルを暗号化する";
-
-/* No comment provided by engineer. */
 "Encrypted database" = "暗号化済みデータベース";
 
 /* notification */
@@ -1355,9 +1352,6 @@
 
 /* No comment provided by engineer. */
 "Error creating profile!" = "プロフィール作成にエラー発生！";
-
-/* No comment provided by engineer. */
-"Error decrypting file" = "ファイルの復号エラー";
 
 /* No comment provided by engineer. */
 "Error deleting chat database" = "チャットデータベース削除にエラー発生";

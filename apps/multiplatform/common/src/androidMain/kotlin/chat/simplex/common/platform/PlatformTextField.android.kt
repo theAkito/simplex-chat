@@ -44,7 +44,6 @@ import java.net.URI
 @Composable
 actual fun PlatformTextField(
   composeState: MutableState<ComposeState>,
-  sendMsgEnabled: Boolean,
   textStyle: MutableState<TextStyle>,
   showDeleteTextButton: MutableState<Boolean>,
   userIsObserver: Boolean,
@@ -61,7 +60,6 @@ actual fun PlatformTextField(
   val paddingEnd = with(LocalDensity.current) { 45.dp.roundToPx() }
   val paddingBottom = with(LocalDensity.current) { 7.dp.roundToPx() }
   var showKeyboard by remember { mutableStateOf(false) }
-  var freeFocus by remember { mutableStateOf(false) }
   LaunchedEffect(cs.contextItem) {
     if (cs.contextItem is ComposeContextItem.QuotedItem) {
       delay(100)
@@ -70,11 +68,6 @@ actual fun PlatformTextField(
       // Keyboard will not show up if we try to show it too fast
       delay(300)
       showKeyboard = true
-    }
-  }
-  LaunchedEffect(sendMsgEnabled) {
-    if (!sendMsgEnabled) {
-      freeFocus = true
     }
   }
 
@@ -148,11 +141,6 @@ actual fun PlatformTextField(
       val imm: InputMethodManager = androidAppContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
       imm.showSoftInput(it, InputMethodManager.SHOW_IMPLICIT)
       showKeyboard = false
-    }
-    if (freeFocus) {
-      it.clearFocus()
-      hideKeyboard(it)
-      freeFocus = false
     }
     showDeleteTextButton.value = it.lineCount >= 4 && !cs.inProgress
   }
