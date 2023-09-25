@@ -1,6 +1,6 @@
 {
   description = "nix flake for simplex-chat";
-  inputs.haskellNix.url = "github:input-output-hk/haskell.nix/armv7a";
+  inputs.haskellNix.url = "github:input-output-hk/haskell.nix?ref=angerman/setupBuildFlags";
   # inputs.haskellNix.inputs.nixpkgs.follows = "nixpkgs";
   # inputs.nixpkgs.url = "github:angerman/nixpkgs/release-22.11";
   inputs.nixpkgs.follows = "haskellNix/nixpkgs";
@@ -32,7 +32,7 @@
       let pkgs = haskellNix.legacyPackages.${system}.appendOverlays [android26]; in
       let drv' = { extra-modules, pkgs', ... }: pkgs'.haskell-nix.project {
         compiler-nix-name = "ghc8107";
-        index-state = "2022-06-20T00:00:00Z";
+        index-state = "2023-09-21T00:00:00Z";
         # We need this, to specify we want the cabal project.
         # If the stack.yaml was dropped, this would not be necessary.
         projectFileName = "cabal.project";
@@ -125,14 +125,26 @@
               );in {
               "${pkgs.pkgsCross.musl64.hostPlatform.system}-static:exe:simplex-chat" = (drv pkgs.pkgsCross.musl64).simplex-chat.components.exes.simplex-chat;
               "${pkgs.pkgsCross.musl32.hostPlatform.system}-static:exe:simplex-chat" = (drv pkgs.pkgsCross.musl32).simplex-chat.components.exes.simplex-chat;
-              "${pkgs.pkgsCross.mingwW64.hostPlatform.system}:exe:simplex-chat" = (drv pkgs.pkgsCross.mingwW64).simplex-chat.components.exes.simplex-chat.override {
+              "${pkgs.pkgsCross.mingwW64.hostPlatform.system}:exe:simplex-chat" = (drv' {
+                pkgs' = pkgs.pkgsCross.mingwW64;
+                extra-modules = [{
+                  packages.direct-sqlcipher.flags.openssl = true;
+                  packages.bitvec.flags.simd = false;
+                  packages.direct-sqlcipher.patches = [
+                    ./scripts/nix/direct-sqlcipher-2.3.27-win.patch
+                  ];
+                  packages.direct-sqlcipher.components.library.libs = pkgs.lib.mkForce [
+                    (pkgs.pkgsCross.mingwW64.openssl) #.override) # { static = true; enableKTLS = false; })
+                  ];
+                }];
+                }).simplex-chat.components.exes.simplex-chat.override {
                 postInstall = ''
                   set -x
                   ${pkgs.tree}/bin/tree $out
                   mkdir -p $out/_pkg
                   cp $out/bin/* $out/_pkg
                   ${pkgs.tree}/bin/tree $out/_pkg
-                  (cd $out/_pkg; ${pkgs.zip}/bin/zip -r -9 $out/${pkgs.pkgsCross.mingwW64.hostPlatform.system}-ximplex-chat.zip *)
+                  (cd $out/_pkg; ${pkgs.zip}/bin/zip -r -9 $out/${pkgs.pkgsCross.mingwW64.hostPlatform.system}-simplex-chat.zip *)
                   rm -fR $out/_pkg
                   mkdir -p $out/nix-support
                   echo "file binary-dist \"$(echo $out/*.zip)\"" \
@@ -299,9 +311,13 @@
                 pkgs' = pkgs.pkgsCross.mingwW64;
                 extra-modules = [{
                   packages.direct-sqlcipher.flags.openssl = true;
-                  # packages.direct-sqlcipher.components.library.libs = pkgs.lib.mkForce [
-                  #   (android32Pkgs.openssl.override { static = true; enableKTLS = false; })
-                  # ];
+                  packages.bitvec.flags.simd = false;
+                  packages.direct-sqlcipher.patches = [
+                    ./scripts/nix/direct-sqlcipher-2.3.27-win.patch
+                  ];
+                  packages.direct-sqlcipher.components.library.libs = pkgs.lib.mkForce [
+                    (pkgs.pkgsCross.mingwW64.openssl) #.override) # { static = true; enableKTLS = false; })
+                  ];
                 }];
               }).simplex-chat.components.library
               .override {
